@@ -1,0 +1,23 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <OutputType>Exe</OutputType>
+        <TargetFramework>net8.0</TargetFramework>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Company>Homecare Homebase</Company>
+        <PackAsTool>true</PackAsTool>
+        <PackageId>HCHB.FindLiveExecutionPlan.Tool</PackageId>
+        <ToolCommandName>flep</ToolCommandName>
+        <Authors>MPS Skunkworks</Authors>
+        <Description>Tool to poll SQL Server for executions of queries, then download the currently cached execution
+            plan.</Description>
+        <Copyright>© Homecare Homebase LLC. All rights reserved.</Copyright>
+        <PackageProjectUrl>https://github.com/HomecareHomebase/FindLiveExecutionPlan</PackageProjectUrl>
+        <RepositoryType>git</RepositoryType>
+        <RepositoryUrl>https://github.com/HomecareHomebase/FindLiveExecutionPlan</RepositoryUrl>
+        <PackageTags>hchb mps sql execution plan tool cli console</PackageTags>
+    </PropertyGroup>
+    <ItemGroup>
+        <PackageReference Include="Microsoft.Data.SqlClient" Version="5.2.2"/>
+        <PackageReference Include="Dapper" Version="2.1.28"/>
+    </ItemGroup>
+</Project>
