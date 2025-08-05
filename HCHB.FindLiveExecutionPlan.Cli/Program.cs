@@ -26,12 +26,12 @@ internal static class Program
             PrintUsageInstructions();
             return;
         }
-        var (dbServer, database, queryContainsFilter) = ExtractArgs(args);
+        var (dbServer, database, queryContainsFilters) = ExtractArgs(args);
         var connectionString = GetConnectionString(dbServer, database);
         try
         {
             var firstTimeThrough = true;
-            Console.WriteLine("Polling sp_WhoIsActive for query containing: " + queryContainsFilter);
+            Console.WriteLine("Polling sp_WhoIsActive for query containing any of: " + string.Join(", ", queryContainsFilters));
             await using var connection = new SqlConnection(connectionString);
             bool hasFinalMatch;
             List<Activity> finalMatches;
@@ -56,7 +56,7 @@ internal static class Program
                     firstTimeThrough = false;
                     var interimResults = await GetActivity<ActivityBase>(connection, database);
                     // ReSharper disable once ConditionIsAlwaysTrueOrFalseAccordingToNullableAPIContract lies!
-                    interimMatches = GetInterimMatches(interimResults, queryContainsFilter);
+                    interimMatches = GetInterimMatches(interimResults, queryContainsFilters);
                     hasMatch = interimMatches.Count != 0;
                 } while (!hasMatch);
                 await spinnerCts.CancelAsync();
@@ -66,7 +66,7 @@ internal static class Program
                 Console.WriteLine("Rerunning sp_WhoIsActive with get_plans=1...");
                 var finalResults = await GetActivity<Activity>(connection, database, true);
                 // ReSharper disable ConditionIsAlwaysTrueOrFalseAccordingToNullableAPIContract lies!
-                finalMatches = GetFinalMatches(finalResults, queryContainsFilter);
+                finalMatches = GetFinalMatches(finalResults, queryContainsFilters);
                 // ReSharper enable ConditionIsAlwaysTrueOrFalseAccordingToNullableAPIContract
                 hasFinalMatch = finalMatches.Count != 0;
                 MaybePrintRerun(hasFinalMatch);
@@ -80,11 +80,11 @@ internal static class Program
     }
 
     private static List<ActivityBase> GetInterimMatches(IEnumerable<ActivityBase> interimResults,
-        string queryContainsFilter)
+        string[] queryContainsFilters)
     {
         return interimResults.Where(x =>
             x.SqlText is not null &&
-            x.SqlText.Contains(queryContainsFilter, StringComparison.OrdinalIgnoreCase)).ToList();
+            queryContainsFilters.Any(filter => x.SqlText.Contains(filter, StringComparison.OrdinalIgnoreCase))).ToList();
     }
 
     private static void MaybePrintRerun(bool hasFinalMatch)
@@ -94,11 +94,11 @@ internal static class Program
                 "When rerunning sp_WhoIsActive with get_plans=1, no matches were found. Starting again...");
     }
 
-    private static List<Activity> GetFinalMatches(IEnumerable<Activity> finalResults, string queryContainsFilter)
+    private static List<Activity> GetFinalMatches(IEnumerable<Activity> finalResults, string[] queryContainsFilters)
     {
         return finalResults.Where(x =>
             x.SqlText is not null && x.QueryPlan is not null &&
-            x.SqlText.Contains(queryContainsFilter, StringComparison.OrdinalIgnoreCase)).ToList();
+            queryContainsFilters.Any(filter => x.SqlText.Contains(filter, StringComparison.OrdinalIgnoreCase))).ToList();
     }
 
     private static string GetPrintableSqlText(List<ActivityBase> interimMatches)
@@ -108,20 +108,23 @@ internal static class Program
         return sqlText;
     }
 
-    private static (string, string, string) ExtractArgs(string[] args)
+    private static (string, string, string[]) ExtractArgs(string[] args)
     {
-        return (args[0], args[1], args[2]);
+        // Extract all arguments from index 2 onwards as filter strings
+        var queryContainsFilters = args.Skip(2).ToArray();
+        return (args[0], args[1], queryContainsFilters);
     }
 
     private static void PrintUsageInstructions()
     {
         // Write usage to stderr:
-        Console.Error.WriteLine($"Usage: {executable} <dbServer> <database> <queryContainsFilter>");
+        Console.Error.WriteLine($"Usage: {executable} <dbServer> <database> <queryContainsFilter1> [queryContainsFilter2] [queryContainsFilter3] ...");
+        Console.Error.WriteLine("  The application will search for queries containing ANY of the provided filter strings.");
     }
 
     private static bool ValidateArgs(string[] args)
     {
-        return args.Length == 3;
+        return args.Length >= 3;
     }
 
     private static async Task SaveReports(List<Activity> finalMatches)
